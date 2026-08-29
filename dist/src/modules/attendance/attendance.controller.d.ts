@@ -7,97 +7,97 @@ export declare class AttendanceController {
         success: boolean;
         message: string;
         data: ({
-            post: {
-                id: string;
-                name: string;
-            };
             user: {
-                id: string;
                 name: string;
+                id: string;
                 employeeId: string;
                 role: import(".prisma/client").$Enums.Role;
             };
             markedBy: {
-                id: string;
                 name: string;
+                id: string;
                 role: import(".prisma/client").$Enums.Role;
+            };
+            post: {
+                name: string;
+                id: string;
             };
         } & {
             id: string;
-            createdAt: Date;
-            updatedAt: Date;
-            postId: string;
-            userId: string;
             date: Date;
+            checkInTime: Date;
             shiftHours: number;
             status: import(".prisma/client").$Enums.AttendanceStatus;
+            userId: string;
+            markedById: string;
+            postId: string;
             captureLatitude: number | null;
             captureLongitude: number | null;
             captureAddress: string | null;
-            checkInTime: Date;
-            markedById: string;
+            createdAt: Date;
+            updatedAt: Date;
         })[];
     }>;
     getAllAttendance(): Promise<({
-        post: {
-            id: string;
-            name: string;
-        };
         user: {
-            id: string;
             name: string;
+            id: string;
             employeeId: string;
             role: import(".prisma/client").$Enums.Role;
         };
         markedBy: {
-            id: string;
             name: string;
+            id: string;
             role: import(".prisma/client").$Enums.Role;
+        };
+        post: {
+            name: string;
+            id: string;
         };
     } & {
         id: string;
-        createdAt: Date;
-        updatedAt: Date;
-        postId: string;
-        userId: string;
         date: Date;
+        checkInTime: Date;
         shiftHours: number;
         status: import(".prisma/client").$Enums.AttendanceStatus;
+        userId: string;
+        markedById: string;
+        postId: string;
         captureLatitude: number | null;
         captureLongitude: number | null;
         captureAddress: string | null;
-        checkInTime: Date;
-        markedById: string;
+        createdAt: Date;
+        updatedAt: Date;
     })[]>;
     getHistory(userId: string, filter: string): Promise<({
-        post: {
-            id: string;
-            name: string;
-        };
         user: {
-            id: string;
             name: string;
+            id: string;
             employeeId: string;
             role: import(".prisma/client").$Enums.Role;
         };
         markedBy: {
-            id: string;
             name: string;
+            id: string;
             role: import(".prisma/client").$Enums.Role;
+        };
+        post: {
+            name: string;
+            id: string;
         };
     } & {
         id: string;
-        createdAt: Date;
-        updatedAt: Date;
-        postId: string;
-        userId: string;
         date: Date;
+        checkInTime: Date;
         shiftHours: number;
         status: import(".prisma/client").$Enums.AttendanceStatus;
+        userId: string;
+        markedById: string;
+        postId: string;
         captureLatitude: number | null;
         captureLongitude: number | null;
         captureAddress: string | null;
-        checkInTime: Date;
-        markedById: string;
+        createdAt: Date;
+        updatedAt: Date;
     })[]>;
 }

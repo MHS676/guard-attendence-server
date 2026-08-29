@@ -202,6 +202,16 @@ async function main() {
     },
   });
 
+  // Create/Upsert BATB
+  const batbCompany = await prisma.company.upsert({
+    where: { name: 'BATB' },
+    update: {},
+    create: {
+      code: 'COMP-003',
+      name: 'BATB',
+    },
+  });
+
   let postCount = 0;
 
   // ======================================================

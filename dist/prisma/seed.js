@@ -171,6 +171,14 @@ async function main() {
             name: 'Robi',
         },
     });
+    const batbCompany = await prisma.company.upsert({
+        where: { name: 'BATB' },
+        update: {},
+        create: {
+            code: 'COMP-003',
+            name: 'BATB',
+        },
+    });
     let postCount = 0;
     const clientFilePath = path.join(process.cwd(), 'Client List with Address 18.07.2026.xlsx');
     try {
