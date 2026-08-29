@@ -1,0 +1,10 @@
+-- AlterTable
+ALTER TABLE "attendances" ALTER COLUMN "captureLatitude" DROP NOT NULL,
+ALTER COLUMN "captureLongitude" DROP NOT NULL;
+
+-- AlterTable
+ALTER TABLE "users" ADD COLUMN     "isActive" BOOLEAN NOT NULL DEFAULT true,
+ADD COLUMN     "refreshToken" TEXT,
+ADD COLUMN     "tokenVersion" INTEGER NOT NULL DEFAULT 0,
+ALTER COLUMN "email" DROP NOT NULL,
+ALTER COLUMN "role" SET DEFAULT 'SECURITY_GUARD';

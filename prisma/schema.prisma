@@ -1,0 +1,146 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum Role {
+  COORDINATOR
+  CLIENT
+  SECURITY_IN_CHARGE
+  SECURITY_SUPERVISOR
+  SECURITY_GUARD
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  LEAVE
+}
+
+model Company {
+  id        String         @id @default(uuid())
+  code      String         @unique
+  name      String         @unique
+  posts     Post[]
+  guards    GuardProfile[]
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  @@map("companies")
+}
+
+model Post {
+  id          String         @id @default(uuid())
+  code        String
+  name        String
+  address     String?
+  territory   String?
+  latitude    Float
+  longitude   Float
+
+  companyId   String
+  company     Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  users       User[]
+  guards      GuardProfile[]
+  attendances Attendance[]
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@unique([companyId, code])
+  @@index([companyId])
+  @@map("posts")
+}
+
+model GuardProfile {
+  id          String    @id @default(uuid())
+  userCode    String?   @unique @map("user_code")
+  mobile      String?
+  designation String?
+  userRole    String?   @map("user_role")
+  territory   String?
+  joiningDate DateTime? @map("joining_date") @db.Date
+
+  userId      String?   @unique
+  user        User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  postId      String?
+  post        Post?     @relation(fields: [postId], references: [id], onDelete: SetNull)
+
+  companyId   String?
+  company     Company?  @relation(fields: [companyId], references: [id], onDelete: SetNull)
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([postId])
+  @@index([companyId])
+  @@map("guard_profiles")
+}
+
+model User {
+  id                String        @id @default(uuid())
+  employeeId        String        @unique
+  email             String?       @unique  // Made optional if guards don't have emails
+  password          String
+  name              String
+  role              Role          @default(SECURITY_GUARD)
+  
+  refreshToken      String?       // For secure session renewals
+  tokenVersion      Int           @default(0) // Bump this integer to invalidate all active JWTs for a user
+  isActive          Boolean       @default(true) // Disable deactivated/former guard accounts instantly
+
+  supervisorId      String?
+  supervisor        User?         @relation("UserHierarchy", fields: [supervisorId], references: [id], onDelete: SetNull)
+  subordinates      User[]        @relation("UserHierarchy")
+
+  postId            String?
+  post              Post?         @relation(fields: [postId], references: [id], onDelete: SetNull)
+
+  guardProfile      GuardProfile?
+
+  attendancesLogged Attendance[]  @relation("GuardAttendance")
+  attendancesMarked Attendance[]  @relation("MarkedBySupervisor")
+
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  @@index([postId])
+  @@index([supervisorId])
+  @@map("users")
+}
+
+model Attendance {
+  id               String           @id @default(uuid())
+  date             DateTime         @db.Date
+  checkInTime      DateTime         @default(now())
+  shiftHours       Int              @default(8)
+  status           AttendanceStatus @default(PRESENT)
+
+  userId           String
+  user             User             @relation("GuardAttendance", fields: [userId], references: [id], onDelete: Cascade)
+
+  markedById       String
+  markedBy         User             @relation("MarkedBySupervisor", fields: [markedById], references: [id], onDelete: Restrict)
+
+  postId           String
+  post             Post             @relation(fields: [postId], references: [id], onDelete: Restrict)
+
+  // Make coordinates optional
+  captureLatitude  Float?
+  captureLongitude Float?
+  captureAddress   String?
+
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  @@unique([userId, date])
+  @@index([date, postId])
+  @@index([userId, date])
+  @@index([markedById])
+  @@map("attendances")
+}

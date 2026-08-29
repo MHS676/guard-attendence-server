@@ -1,0 +1,459 @@
+import { PrismaClient, Role } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { Pool } from 'pg';
+import * as xlsx from 'xlsx';
+import * as path from 'path';
+import * as dotenv from 'dotenv';
+import axios from 'axios';
+import * as bcrypt from 'bcrypt';
+
+dotenv.config();
+
+const connectionString = process.env.DATABASE_URL;
+
+const pool = new Pool({ connectionString });
+const adapter = new PrismaPg(pool);
+const prisma = new PrismaClient({ adapter });
+
+// Coordinate lookup map for Bangladesh areas & districts
+const AREA_COORDINATE_MAP: Record<string, { lat: number; lng: number }> = {
+  patuakhali: { lat: 22.3596, lng: 90.3299 },
+  barguna: { lat: 22.157, lng: 90.126 },
+  bagerhat: { lat: 22.6516, lng: 89.7859 },
+  barishal: { lat: 22.701, lng: 90.3535 },
+  barisal: { lat: 22.701, lng: 90.3535 },
+  bhola: { lat: 22.6859, lng: 90.6482 },
+  jhalakathi: { lat: 22.6406, lng: 90.1987 },
+  pirojpur: { lat: 22.5841, lng: 89.972 },
+  gopalganj: { lat: 23.005, lng: 89.8266 },
+  faridpur: { lat: 23.607, lng: 89.8429 },
+  madaripur: { lat: 23.1641, lng: 90.1897 },
+  rajbari: { lat: 23.7574, lng: 89.6444 },
+  shariatpur: { lat: 23.2423, lng: 90.4348 },
+  khulna: { lat: 22.8456, lng: 89.5403 },
+  jashore: { lat: 23.1664, lng: 89.2081 },
+  jessore: { lat: 23.1664, lng: 89.2081 },
+  satkhira: { lat: 22.7185, lng: 89.0705 },
+  jhenaidah: { lat: 23.5448, lng: 89.1539 },
+  magura: { lat: 23.4873, lng: 89.4199 },
+  chuadanga: { lat: 23.6401, lng: 88.8418 },
+  meherpur: { lat: 23.7622, lng: 88.6318 },
+  narail: { lat: 23.1725, lng: 89.5127 },
+  kushtia: { lat: 23.9013, lng: 89.1204 },
+  rajshahi: { lat: 24.3745, lng: 88.6042 },
+  bogura: { lat: 24.8465, lng: 89.3777 },
+  bogra: { lat: 24.8465, lng: 89.3777 },
+  natore: { lat: 24.4102, lng: 89.0076 },
+  pabna: { lat: 24.0114, lng: 89.2503 },
+  sirajganj: { lat: 24.4534, lng: 89.7008 },
+  dinajpur: { lat: 25.6279, lng: 88.6332 },
+  gaibandha: { lat: 25.3287, lng: 89.542 },
+  kurigram: { lat: 25.8054, lng: 89.6361 },
+  lalmonirhat: { lat: 25.9159, lng: 89.4526 },
+  nilphamari: { lat: 25.9312, lng: 88.856 },
+  panchagarh: { lat: 26.3411, lng: 88.5542 },
+  rangpur: { lat: 25.7439, lng: 89.2752 },
+  thakurgaon: { lat: 26.0337, lng: 88.4617 },
+  mymensingh: { lat: 24.7471, lng: 90.4203 },
+  jamalpur: { lat: 24.9375, lng: 89.9377 },
+  netrokona: { lat: 24.8703, lng: 90.7279 },
+  sherpur: { lat: 25.0204, lng: 90.0153 },
+  tangail: { lat: 24.2513, lng: 89.9167 },
+  chandpur: { lat: 23.2321, lng: 90.6631 },
+  feni: { lat: 23.0159, lng: 91.3976 },
+  lakshmipur: { lat: 22.9447, lng: 90.8282 },
+  noakhali: { lat: 22.8696, lng: 91.0993 },
+  baridhara: { lat: 23.8068, lng: 90.4156 },
+  dhanmondi: { lat: 23.7461, lng: 90.3742 },
+  gulshan: { lat: 23.7925, lng: 90.4078 },
+  banani: { lat: 23.7937, lng: 90.4066 },
+  uttara: { lat: 23.8759, lng: 90.3795 },
+  mirpur: { lat: 23.8069, lng: 90.3687 },
+  motijheel: { lat: 23.733, lng: 90.4172 },
+  mohakhali: { lat: 23.7778, lng: 90.4055 },
+  bashundhara: { lat: 23.8191, lng: 90.4526 },
+  narayanganj: { lat: 23.6238, lng: 90.5 },
+  chittagong: { lat: 22.3569, lng: 91.7832 },
+};
+
+const DEFAULT_CENTER = { lat: 23.8103, lng: 90.4125 };
+
+async function fetchCoordinates(address: string, location: string) {
+  const cleanSearch = `${address || location}, Bangladesh`;
+
+  try {
+    const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+      cleanSearch
+    )}&limit=1`;
+
+    const res = await axios.get(url, {
+      headers: { 'User-Agent': 'FalconManagementSeeder/1.0' },
+      timeout: 3000,
+    });
+
+    if (res.data && res.data.length > 0) {
+      return {
+        lat: parseFloat(res.data[0].lat),
+        lng: parseFloat(res.data[0].lon),
+      };
+    }
+  } catch (err) {
+    // Fall back to dictionary parsing on timeout or rate limit
+  }
+
+  const combinedText = `${address} ${location}`.toLowerCase();
+  for (const [key, coords] of Object.entries(AREA_COORDINATE_MAP)) {
+    if (combinedText.includes(key)) {
+      return coords;
+    }
+  }
+
+  return DEFAULT_CENTER;
+}
+
+async function main() {
+  console.log('Preserving existing records and executing safe upserts...');
+
+  // ======================================================
+  // 0. SEED DEFAULT ADMIN & DEMO USERS FOR MOBILE LOGIN
+  // ======================================================
+  console.log(`\n--- Seeding Default System Users ---`);
+  
+  const defaultUsers = [
+    {
+      email: 'admin@falconsecurity.com',
+      employeeId: '1000',
+      password: 'FalconPassword123!',
+      name: 'System Admin',
+      role: Role.COORDINATOR,
+    },
+    {
+      email: 'demo@falconsecurity.com',
+      employeeId: '1001',
+      password: 'Falcon@2026',
+      name: 'Demo Guard',
+      role: Role.SECURITY_GUARD,
+    },
+  ];
+
+  for (const u of defaultUsers) {
+    const hashedPassword = await bcrypt.hash(u.password, 10);
+
+    const createdUser = await prisma.user.upsert({
+      where: { email: u.email },
+      update: {
+        password: hashedPassword,
+        employeeId: u.employeeId,
+        role: u.role,
+        name: u.name,
+      },
+      create: {
+        email: u.email,
+        employeeId: u.employeeId,
+        password: hashedPassword,
+        name: u.name,
+        role: u.role,
+      },
+    });
+
+    console.log(`✅ Default User Pushed: ${createdUser.email} (ID: ${createdUser.employeeId})`);
+  }
+
+  // ======================================================
+  // 0b. SEED DEMO CLIENT USER
+  // ======================================================
+  console.log(`\n--- Seeding Demo Client User ---`);
+  const clientUserUpsert = await prisma.user.upsert({
+    where: { email: 'client@demo.com' },
+    update: {
+      password: await bcrypt.hash('ClientPass123!', 10),
+      employeeId: '2000',
+      role: 'CLIENT' as Role,
+      name: 'Demo Client',
+    },
+    create: {
+      email: 'client@demo.com',
+      employeeId: '2000',
+      password: await bcrypt.hash('ClientPass123!', 10),
+      name: 'Demo Client',
+      role: 'CLIENT' as Role,
+    },
+  });
+
+  console.log(`✅ Demo Client ensured: ${clientUserUpsert.email}`);
+
+  // Create/Upsert Falcon Security Limited
+  const falconCompany = await prisma.company.upsert({
+    where: { name: 'Falcon Security Limited' },
+    update: {},
+    create: {
+      code: 'COMP-001',
+      name: 'Falcon Security Limited',
+    },
+  });
+
+  // Create/Upsert Robi
+  const robiCompany = await prisma.company.upsert({
+    where: { name: 'Robi' },
+    update: {},
+    create: {
+      code: 'COMP-002',
+      name: 'Robi',
+    },
+  });
+
+  let postCount = 0;
+
+  // ======================================================
+  // 1. SEED CLIENT LIST -> FALCON SECURITY LIMITED
+  // ======================================================
+  const clientFilePath = path.join(process.cwd(), 'Client List with Address 18.07.2026.xlsx');
+  try {
+    console.log(`\n--- Seeding Client List under Falcon Security Limited ---`);
+    const clientWb = xlsx.readFile(clientFilePath);
+    const clientSheet = clientWb.Sheets[clientWb.SheetNames[0]];
+    const clientRows: any[] = xlsx.utils.sheet_to_json(clientSheet, { range: 3 });
+
+    for (const row of clientRows) {
+      const rawPostName = row[' Posts'] || row['Posts'] || row['Client Name'] || row['Name'];
+      const rawAddress = row['Address'] || row['Client Address'];
+      const rawLocation = row['Locations'] || row['Location'] || '';
+
+      if (!rawPostName || typeof rawPostName !== 'string') continue;
+
+      const name = rawPostName.trim();
+      if (!name) continue;
+
+      const address = rawAddress && String(rawAddress).trim() !== '' ? String(rawAddress).trim() : null;
+      const location = String(rawLocation).trim();
+
+      postCount++;
+      const postCode = `POST-${String(postCount).padStart(3, '0')}`;
+      const coords = await fetchCoordinates(address || '', location);
+
+      await prisma.post.upsert({
+        where: {
+          companyId_code: {
+            companyId: falconCompany.id,
+            code: postCode,
+          },
+        },
+        update: {
+          name: name,
+          address: address || location || null,
+          latitude: coords.lat,
+          longitude: coords.lng,
+          companyId: falconCompany.id,
+        },
+        create: {
+          code: postCode,
+          name: name,
+          address: address || location || null,
+          latitude: coords.lat,
+          longitude: coords.lng,
+          companyId: falconCompany.id,
+        },
+      });
+
+      console.log(`[Falcon ${postCount}] ${postCode} - ${name} (${coords.lat}, ${coords.lng})`);
+    }
+  } catch (err: any) {
+    console.warn(`Could not read Client List file: ${err.message}`);
+  }
+
+  // ======================================================
+  // 2. SEED BTS DATABASE -> ROBI
+  // ======================================================
+  const robiFilePath = path.join(process.cwd(), '(340) BTS DATABASE (Robi new Sims) Information.xls');
+  try {
+    console.log(`\n--- Seeding BTS Database under Robi ---`);
+    const robiWb = xlsx.readFile(robiFilePath);
+    const robiSheet = robiWb.Sheets['Main Sheet_31 Jan_2022'] || robiWb.Sheets[robiWb.SheetNames[0]];
+    const robiRows: any[] = xlsx.utils.sheet_to_json(robiSheet, { range: 2 });
+
+    for (const row of robiRows) {
+      const robiCode = row['Robi code'] ? String(row['Robi code']).trim() : null;
+      const airtelCode = row['Airtel code'] ? String(row['Airtel code']).trim() : null;
+      const district = row['District'] ? String(row['District']).trim() : '';
+      const thana = row['Thana'] ? String(row['Thana']).trim() : '';
+      const rawAddress = row['  \nAddress'] || row['Address'] || '';
+      const address = String(rawAddress).trim().replace(/\n/g, ' ');
+
+      const code = robiCode || airtelCode;
+      if (!code || code === 'Robi code') continue;
+
+      const postName = `BTS ${code} (${thana || district})`;
+      const fullAddress = `${address} ${thana} ${district}`.trim();
+
+      postCount++;
+      const postCode = code;
+      const coords = await fetchCoordinates(fullAddress, district);
+
+      await prisma.post.upsert({
+        where: {
+          companyId_code: {
+            companyId: robiCompany.id,
+            code: postCode,
+          },
+        },
+        update: {
+          name: postName,
+          address: fullAddress || null,
+          latitude: coords.lat,
+          longitude: coords.lng,
+          companyId: robiCompany.id,
+        },
+        create: {
+          code: postCode,
+          name: postName,
+          address: fullAddress || null,
+          latitude: coords.lat,
+          longitude: coords.lng,
+          companyId: robiCompany.id,
+        },
+      });
+
+      console.log(`[Robi ${postCount}] ${postCode} - ${postName} (${coords.lat}, ${coords.lng})`);
+    }
+  } catch (err: any) {
+    console.warn(`Could not read Robi BTS file: ${err.message}`);
+  }
+
+  // ======================================================
+  // 3. SEED GUARDS & USERS -> ROBI SFA 340
+  // ======================================================
+  const guardFilePath = path.join(
+    process.cwd(),
+    'Robi SFA 340 User Format(8) Information New.xlsx'
+  );
+
+  try {
+    console.log(`\n--- Seeding Guards from Robi SFA 340 ---`);
+    const guardWb = xlsx.readFile(guardFilePath);
+    const guardSheet = guardWb.Sheets[guardWb.SheetNames[0]];
+    const guardRows: any[] = xlsx.utils.sheet_to_json(guardSheet);
+
+    let guardCount = 0;
+    const defaultGuardPassword = await bcrypt.hash('Password123!', 10);
+
+    for (const row of guardRows) {
+      const rawName = row['User Name'];
+      const userCode = row['User Code'] ? String(row['User Code']).trim() : null;
+      const rawMobile = row['Mobile'] ? String(row['Mobile']).trim() : '';
+      const rawDesignation = row['Designation'] ? String(row['Designation']).trim() : 'Security Guard';
+      const joiningDateRaw = row['JoiningDate'];
+
+      if (!rawName || !userCode) continue;
+
+      const name = String(rawName).trim();
+      const phone = rawMobile.replace(/[^0-9+]/g, '');
+      const designation = rawDesignation.replace(/\$\$/g, '').trim();
+
+      let joiningDate: Date | null = null;
+      if (joiningDateRaw) {
+        const parsed = new Date(joiningDateRaw);
+        if (!isNaN(parsed.getTime())) {
+          joiningDate = parsed;
+        }
+      }
+
+      const assignedRole = designation.toLowerCase().includes('manager')
+        ? Role.SECURITY_SUPERVISOR
+        : Role.SECURITY_GUARD;
+
+      // 1. Upsert User record (hashed password required by User schema)
+      const user = await prisma.user.upsert({
+        where: { employeeId: userCode },
+        update: {
+          name: name,
+          role: assignedRole,
+        },
+        create: {
+          employeeId: userCode,
+          email: `${userCode.toLowerCase()}@robi.com`,
+          password: defaultGuardPassword,
+          name: name,
+          role: assignedRole,
+        },
+      });
+
+      // 2. Upsert GuardProfile linked to User & Company
+      await prisma.guardProfile.upsert({
+        where: { userId: user.id },
+        update: {
+          mobile: phone || null,
+          designation: designation,
+          userRole: row['User Role Name'] ? String(row['User Role Name']).trim() : null,
+          joiningDate: joiningDate,
+          companyId: robiCompany.id,
+        },
+        create: {
+          userId: user.id,
+          mobile: phone || null,
+          designation: designation,
+          userRole: row['User Role Name'] ? String(row['User Role Name']).trim() : null,
+          joiningDate: joiningDate,
+          companyId: robiCompany.id,
+        },
+      });
+
+      guardCount++;
+      console.log(`[Guard ${guardCount}] ${userCode} - ${name} (${designation})`);
+    }
+
+    console.log(`\n✅ Successfully seeded ${guardCount} guards into User and GuardProfile!`);
+  } catch (err: any) {
+    console.warn(`Could not read Guard List file: ${err.message}`);
+  }
+
+  console.log(`\n✅ Finished upserting system users, ${postCount} posts, and guard records!`);
+
+  // ======================================================
+  // 4. CREATE DEMO ATTENDANCE RECORDS FOR DEMO GUARD
+  // ======================================================
+  try {
+    const demoGuard = await prisma.user.findUnique({ where: { employeeId: '1001' } });
+    const samplePost = await prisma.post.findFirst({ where: { companyId: falconCompany.id } });
+
+    if (demoGuard && samplePost) {
+      console.log(`\n--- Creating demo attendance records for ${demoGuard.name} ---`);
+
+      const today = new Date();
+      const attendanceData: any[] = [];
+      for (let i = 1; i <= 20; i++) {
+        const d = new Date(today);
+        d.setDate(today.getDate() - i);
+
+        attendanceData.push({
+          userId: demoGuard.id,
+          markedById: demoGuard.id,
+          postId: samplePost.id,
+          date: new Date(d.getFullYear(), d.getMonth(), d.getDate()),
+          checkInTime: new Date(d.getFullYear(), d.getMonth(), d.getDate(), 9, 0, 0),
+          shiftHours: 8,
+          status: 'PRESENT',
+          captureLatitude: DEFAULT_CENTER.lat,
+          captureLongitude: DEFAULT_CENTER.lng,
+        });
+      }
+
+      // use createMany for bulk insert and skip duplicates if any
+      await prisma.attendance.createMany({ data: attendanceData, skipDuplicates: true });
+      console.log(`✅ Created ${attendanceData.length} demo attendance records for ${demoGuard.employeeId}`);
+    } else {
+      console.warn('Could not create demo attendances: demo guard or sample post not found.');
+    }
+  } catch (err: any) {
+    console.warn('Error creating demo attendance records:', err.message || err);
+  }
+}
+
+main()
+  .catch((e) => {
+    console.error('❌ Error seeding database:', e);
+    process.exit(1);
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+    await pool.end();
+  });
