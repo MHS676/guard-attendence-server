@@ -9,6 +9,7 @@ export class PostsService {
   async findAll() {
     return this.prisma.post.findMany({
       include: {
+        company: { select: { id: true, code: true, name: true } },
         users: { select: { id: true, name: true, role: true } },
       },
     });

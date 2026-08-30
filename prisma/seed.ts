@@ -40,6 +40,7 @@ const AREA_COORDINATE_MAP: Record<string, { lat: number; lng: number }> = {
   meherpur: { lat: 23.7622, lng: 88.6318 },
   narail: { lat: 23.1725, lng: 89.5127 },
   kushtia: { lat: 23.9013, lng: 89.1204 },
+  kustia: { lat: 23.9013, lng: 89.1204 },
   rajshahi: { lat: 24.3745, lng: 88.6042 },
   bogura: { lat: 24.8465, lng: 89.3777 },
   bogra: { lat: 24.8465, lng: 89.3777 },
@@ -77,6 +78,48 @@ const AREA_COORDINATE_MAP: Record<string, { lat: number; lng: number }> = {
 };
 
 const DEFAULT_CENTER = { lat: 23.8103, lng: 90.4125 };
+
+function parseExcelDate(value: any): Date | null {
+  if (!value) return null;
+  if (value instanceof Date && !isNaN(value.getTime())) return value;
+
+  if (typeof value === 'number') {
+    const parsed = xlsx.SSF.parse_date_code(value);
+    if (parsed) {
+      return new Date(parsed.y, parsed.m - 1, parsed.d);
+    }
+  }
+
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+
+    if (trimmed.includes('/')) {
+      const parts = trimmed.split('/');
+      if (parts.length === 3) {
+        const day = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10) - 1;
+        const year = parseInt(parts[2], 10);
+        const dateObj = new Date(year, month, day);
+        if (!isNaN(dateObj.getTime())) return dateObj;
+      }
+    }
+
+    const parsed = new Date(trimmed);
+    if (!isNaN(parsed.getTime())) return parsed;
+  }
+
+  return null;
+}
+
+function mapBatbRole(desig: string): Role {
+  const norm = (desig || '').toLowerCase().trim();
+  if (norm.includes('supervisor')) return Role.SECURITY_SUPERVISOR;
+  if (norm.includes('officer') || norm.includes('insp') || norm.includes('opt')) {
+    return Role.SECURITY_IN_CHARGE;
+  }
+  return Role.SECURITY_GUARD;
+}
 
 async function fetchCoordinates(address: string, location: string) {
   const cleanSearch = `${address || location}, Bangladesh`;
@@ -118,7 +161,7 @@ async function main() {
   // 0. SEED DEFAULT ADMIN & DEMO USERS FOR MOBILE LOGIN
   // ======================================================
   console.log(`\n--- Seeding Default System Users ---`);
-  
+
   const defaultUsers = [
     {
       email: 'admin@falconsecurity.com',
@@ -182,7 +225,7 @@ async function main() {
 
   console.log(`✅ Demo Client ensured: ${clientUserUpsert.email}`);
 
-  // Create/Upsert Falcon Security Limited
+  // Companies
   const falconCompany = await prisma.company.upsert({
     where: { name: 'Falcon Security Limited' },
     update: {},
@@ -192,7 +235,6 @@ async function main() {
     },
   });
 
-  // Create/Upsert Robi
   const robiCompany = await prisma.company.upsert({
     where: { name: 'Robi' },
     update: {},
@@ -202,7 +244,6 @@ async function main() {
     },
   });
 
-  // Create/Upsert BATB
   const batbCompany = await prisma.company.upsert({
     where: { name: 'BATB' },
     update: {},
@@ -359,19 +400,12 @@ async function main() {
       const phone = rawMobile.replace(/[^0-9+]/g, '');
       const designation = rawDesignation.replace(/\$\$/g, '').trim();
 
-      let joiningDate: Date | null = null;
-      if (joiningDateRaw) {
-        const parsed = new Date(joiningDateRaw);
-        if (!isNaN(parsed.getTime())) {
-          joiningDate = parsed;
-        }
-      }
+      const joiningDate = parseExcelDate(joiningDateRaw);
 
       const assignedRole = designation.toLowerCase().includes('manager')
         ? Role.SECURITY_SUPERVISOR
         : Role.SECURITY_GUARD;
 
-      // 1. Upsert User record (hashed password required by User schema)
       const user = await prisma.user.upsert({
         where: { employeeId: userCode },
         update: {
@@ -387,7 +421,6 @@ async function main() {
         },
       });
 
-      // 2. Upsert GuardProfile linked to User & Company
       await prisma.guardProfile.upsert({
         where: { userId: user.id },
         update: {
@@ -411,15 +444,119 @@ async function main() {
       console.log(`[Guard ${guardCount}] ${userCode} - ${name} (${designation})`);
     }
 
-    console.log(`\n✅ Successfully seeded ${guardCount} guards into User and GuardProfile!`);
+    console.log(`\n✅ Successfully seeded ${guardCount} Robi guards into User and GuardProfile!`);
   } catch (err: any) {
     console.warn(`Could not read Guard List file: ${err.message}`);
   }
 
-  console.log(`\n✅ Finished upserting system users, ${postCount} posts, and guard records!`);
+  // ======================================================
+  // 4. SEED BATB POSTS, USERS & GUARDS
+  // ======================================================
+  const batbFilePath = path.join(process.cwd(), 'BATB Post Salary Personal List.xls');
+  try {
+    console.log(`\n--- Seeding BATB Posts, Users, and Guard Profiles ---`);
+    const batbWb = xlsx.readFile(batbFilePath);
+    const batbSheet = batbWb.Sheets[batbWb.SheetNames[0]];
+
+    // Auto-detect row 0 as header
+    const batbRows: any[] = xlsx.utils.sheet_to_json(batbSheet);
+
+    let batbGuardCount = 0;
+    const defaultBatbPassword = await bcrypt.hash('Password123!', 10);
+
+    for (const row of batbRows) {
+      const employeeId = row['ID Number'] ? String(row['ID Number']).trim() : null;
+      const rawName = row['Security Personal Name'];
+      const rawDesig = row['Desig'] ? String(row['Desig']).trim() : 'Guard';
+      const rawPostName = row['Post Name'] ? String(row['Post Name']).trim() : null;
+      const rawMobile = row['A/C No'] ? String(row['A/C No']).trim() : '';
+      const rawJoiningDate = row['Date of Joynt'];
+
+      if (!employeeId || !rawName || employeeId === 'ID Number') continue;
+
+      const name = String(rawName).trim();
+      const mobile = rawMobile.replace(/[^0-9+]/g, '');
+      const joiningDate = parseExcelDate(rawJoiningDate);
+
+      // 1. Create or resolve BATB Post
+      let post = null;
+      if (rawPostName) {
+        const postCode = `BATB-${rawPostName.toUpperCase().replace(/[^A-Z0-9]/g, '_')}`;
+        const coords = await fetchCoordinates(rawPostName, rawPostName);
+
+        post = await prisma.post.upsert({
+          where: {
+            companyId_code: {
+              companyId: batbCompany.id,
+              code: postCode,
+            },
+          },
+          update: {
+            name: rawPostName,
+            latitude: coords.lat,
+            longitude: coords.lng,
+          },
+          create: {
+            code: postCode,
+            name: rawPostName,
+            companyId: batbCompany.id,
+            latitude: coords.lat,
+            longitude: coords.lng,
+          },
+        });
+      }
+
+      const assignedRole = mapBatbRole(rawDesig);
+
+      // 2. Upsert User
+      const user = await prisma.user.upsert({
+        where: { employeeId: employeeId },
+        update: {
+          name: name,
+          role: assignedRole,
+          postId: post?.id ?? null,
+        },
+        create: {
+          employeeId: employeeId,
+          email: `${employeeId.toLowerCase()}@batb.com`,
+          password: defaultBatbPassword,
+          name: name,
+          role: assignedRole,
+          postId: post?.id ?? null,
+        },
+      });
+
+      // 3. Upsert GuardProfile
+      await prisma.guardProfile.upsert({
+        where: { userId: user.id },
+        update: {
+          mobile: mobile || null,
+          designation: rawDesig,
+          postId: post?.id ?? null,
+          companyId: batbCompany.id,
+          joiningDate: joiningDate,
+        },
+        create: {
+          userId: user.id,
+          mobile: mobile || null,
+          designation: rawDesig,
+          postId: post?.id ?? null,
+          companyId: batbCompany.id,
+          joiningDate: joiningDate,
+        },
+      });
+
+      batbGuardCount++;
+      console.log(`[BATB ${batbGuardCount}] ${employeeId} - ${name} (${rawDesig}) @ ${rawPostName || 'N/A'}`);
+    }
+
+    console.log(`\n✅ Successfully seeded ${batbGuardCount} BATB personnel records!`);
+  } catch (err: any) {
+    console.warn(`Could not read BATB file: ${err.message}`);
+  }
 
   // ======================================================
-  // 4. CREATE DEMO ATTENDANCE RECORDS FOR DEMO GUARD
+  // 5. CREATE DEMO ATTENDANCE RECORDS FOR DEMO GUARD
   // ======================================================
   try {
     const demoGuard = await prisma.user.findUnique({ where: { employeeId: '1001' } });
@@ -447,7 +584,6 @@ async function main() {
         });
       }
 
-      // use createMany for bulk insert and skip duplicates if any
       await prisma.attendance.createMany({ data: attendanceData, skipDuplicates: true });
       console.log(`✅ Created ${attendanceData.length} demo attendance records for ${demoGuard.employeeId}`);
     } else {

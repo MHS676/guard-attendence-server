@@ -37,6 +37,7 @@ const AREA_COORDINATE_MAP = {
     meherpur: { lat: 23.7622, lng: 88.6318 },
     narail: { lat: 23.1725, lng: 89.5127 },
     kushtia: { lat: 23.9013, lng: 89.1204 },
+    kustia: { lat: 23.9013, lng: 89.1204 },
     rajshahi: { lat: 24.3745, lng: 88.6042 },
     bogura: { lat: 24.8465, lng: 89.3777 },
     bogra: { lat: 24.8465, lng: 89.3777 },
@@ -73,6 +74,47 @@ const AREA_COORDINATE_MAP = {
     chittagong: { lat: 22.3569, lng: 91.7832 },
 };
 const DEFAULT_CENTER = { lat: 23.8103, lng: 90.4125 };
+function parseExcelDate(value) {
+    if (!value)
+        return null;
+    if (value instanceof Date && !isNaN(value.getTime()))
+        return value;
+    if (typeof value === 'number') {
+        const parsed = xlsx.SSF.parse_date_code(value);
+        if (parsed) {
+            return new Date(parsed.y, parsed.m - 1, parsed.d);
+        }
+    }
+    if (typeof value === 'string') {
+        const trimmed = value.trim();
+        if (!trimmed)
+            return null;
+        if (trimmed.includes('/')) {
+            const parts = trimmed.split('/');
+            if (parts.length === 3) {
+                const day = parseInt(parts[0], 10);
+                const month = parseInt(parts[1], 10) - 1;
+                const year = parseInt(parts[2], 10);
+                const dateObj = new Date(year, month, day);
+                if (!isNaN(dateObj.getTime()))
+                    return dateObj;
+            }
+        }
+        const parsed = new Date(trimmed);
+        if (!isNaN(parsed.getTime()))
+            return parsed;
+    }
+    return null;
+}
+function mapBatbRole(desig) {
+    const norm = (desig || '').toLowerCase().trim();
+    if (norm.includes('supervisor'))
+        return client_1.Role.SECURITY_SUPERVISOR;
+    if (norm.includes('officer') || norm.includes('insp') || norm.includes('opt')) {
+        return client_1.Role.SECURITY_IN_CHARGE;
+    }
+    return client_1.Role.SECURITY_GUARD;
+}
 async function fetchCoordinates(address, location) {
     const cleanSearch = `${address || location}, Bangladesh`;
     try {
@@ -298,13 +340,7 @@ async function main() {
             const name = String(rawName).trim();
             const phone = rawMobile.replace(/[^0-9+]/g, '');
             const designation = rawDesignation.replace(/\$\$/g, '').trim();
-            let joiningDate = null;
-            if (joiningDateRaw) {
-                const parsed = new Date(joiningDateRaw);
-                if (!isNaN(parsed.getTime())) {
-                    joiningDate = parsed;
-                }
-            }
+            const joiningDate = parseExcelDate(joiningDateRaw);
             const assignedRole = designation.toLowerCase().includes('manager')
                 ? client_1.Role.SECURITY_SUPERVISOR
                 : client_1.Role.SECURITY_GUARD;
@@ -343,12 +379,99 @@ async function main() {
             guardCount++;
             console.log(`[Guard ${guardCount}] ${userCode} - ${name} (${designation})`);
         }
-        console.log(`\n✅ Successfully seeded ${guardCount} guards into User and GuardProfile!`);
+        console.log(`\n✅ Successfully seeded ${guardCount} Robi guards into User and GuardProfile!`);
     }
     catch (err) {
         console.warn(`Could not read Guard List file: ${err.message}`);
     }
-    console.log(`\n✅ Finished upserting system users, ${postCount} posts, and guard records!`);
+    const batbFilePath = path.join(process.cwd(), 'BATB Post Salary Personal List.xls');
+    try {
+        console.log(`\n--- Seeding BATB Posts, Users, and Guard Profiles ---`);
+        const batbWb = xlsx.readFile(batbFilePath);
+        const batbSheet = batbWb.Sheets[batbWb.SheetNames[0]];
+        const batbRows = xlsx.utils.sheet_to_json(batbSheet);
+        let batbGuardCount = 0;
+        const defaultBatbPassword = await bcrypt.hash('Password123!', 10);
+        for (const row of batbRows) {
+            const employeeId = row['ID Number'] ? String(row['ID Number']).trim() : null;
+            const rawName = row['Security Personal Name'];
+            const rawDesig = row['Desig'] ? String(row['Desig']).trim() : 'Guard';
+            const rawPostName = row['Post Name'] ? String(row['Post Name']).trim() : null;
+            const rawMobile = row['A/C No'] ? String(row['A/C No']).trim() : '';
+            const rawJoiningDate = row['Date of Joynt'];
+            if (!employeeId || !rawName || employeeId === 'ID Number')
+                continue;
+            const name = String(rawName).trim();
+            const mobile = rawMobile.replace(/[^0-9+]/g, '');
+            const joiningDate = parseExcelDate(rawJoiningDate);
+            let post = null;
+            if (rawPostName) {
+                const postCode = `BATB-${rawPostName.toUpperCase().replace(/[^A-Z0-9]/g, '_')}`;
+                const coords = await fetchCoordinates(rawPostName, rawPostName);
+                post = await prisma.post.upsert({
+                    where: {
+                        companyId_code: {
+                            companyId: batbCompany.id,
+                            code: postCode,
+                        },
+                    },
+                    update: {
+                        name: rawPostName,
+                        latitude: coords.lat,
+                        longitude: coords.lng,
+                    },
+                    create: {
+                        code: postCode,
+                        name: rawPostName,
+                        companyId: batbCompany.id,
+                        latitude: coords.lat,
+                        longitude: coords.lng,
+                    },
+                });
+            }
+            const assignedRole = mapBatbRole(rawDesig);
+            const user = await prisma.user.upsert({
+                where: { employeeId: employeeId },
+                update: {
+                    name: name,
+                    role: assignedRole,
+                    postId: post?.id ?? null,
+                },
+                create: {
+                    employeeId: employeeId,
+                    email: `${employeeId.toLowerCase()}@batb.com`,
+                    password: defaultBatbPassword,
+                    name: name,
+                    role: assignedRole,
+                    postId: post?.id ?? null,
+                },
+            });
+            await prisma.guardProfile.upsert({
+                where: { userId: user.id },
+                update: {
+                    mobile: mobile || null,
+                    designation: rawDesig,
+                    postId: post?.id ?? null,
+                    companyId: batbCompany.id,
+                    joiningDate: joiningDate,
+                },
+                create: {
+                    userId: user.id,
+                    mobile: mobile || null,
+                    designation: rawDesig,
+                    postId: post?.id ?? null,
+                    companyId: batbCompany.id,
+                    joiningDate: joiningDate,
+                },
+            });
+            batbGuardCount++;
+            console.log(`[BATB ${batbGuardCount}] ${employeeId} - ${name} (${rawDesig}) @ ${rawPostName || 'N/A'}`);
+        }
+        console.log(`\n✅ Successfully seeded ${batbGuardCount} BATB personnel records!`);
+    }
+    catch (err) {
+        console.warn(`Could not read BATB file: ${err.message}`);
+    }
     try {
         const demoGuard = await prisma.user.findUnique({ where: { employeeId: '1001' } });
         const samplePost = await prisma.post.findFirst({ where: { companyId: falconCompany.id } });
