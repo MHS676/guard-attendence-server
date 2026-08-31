@@ -3,21 +3,25 @@ import { AttendanceService } from './attendance.service';
 import { CreateAttendanceDto } from './dto/create-attendance.dto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { RolesGuard, Roles } from '../auth/roles.guard';
+import { CrudGuard, CrudOperation } from '../auth/crud.guard';
+import { Crud } from '../auth/crud.decorator';
 import { Role } from '@prisma/client';
 
 @Controller('attendance')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, CrudGuard)
 export class AttendanceController {
   constructor(private readonly attendanceService: AttendanceService) {}
 
   /**
    * Mark attendance for one or multiple guards
    * Requires: SECURITY_GUARD (self-check-in), SECURITY_SUPERVISOR, COORDINATOR, or SECURITY_IN_CHARGE
+   * CRUD: CREATE (all roles can create their own or assigned attendance)
    */
   @Post()
-  @Roles(Role.SECURITY_GUARD, Role.SECURITY_SUPERVISOR, Role.COORDINATOR, Role.SECURITY_IN_CHARGE)
+  @Crud(CrudOperation.CREATE)
+  @Roles(Role.SECURITY_GUARD, Role.SECURITY_SUPERVISOR, Role.COORDINATOR, Role.SECURITY_IN_CHARGE, Role.CLIENT)
   async createAttendance(@Request() req, @Body() createAttendanceDto: CreateAttendanceDto) {
-    console.log(`📡 [AttendanceController] POST /attendance - Request from user: ${req.user.id}`);
+    console.log(`📡 [AttendanceController] POST /attendance - Request from user: ${req.user.id} (${req.user.role})`);
     console.log(`📡 [AttendanceController] Payload:`, createAttendanceDto);
 
     try {
@@ -43,21 +47,23 @@ export class AttendanceController {
   }
 
   @Get()
+  @Crud(CrudOperation.READ)
   @Roles(Role.COORDINATOR, Role.SECURITY_IN_CHARGE)
   async getAllAttendance() {
     return this.attendanceService.getAllAttendance();
   }
 
-  @Get('user/:userId')
-  @Roles(Role.SECURITY_GUARD, Role.SECURITY_SUPERVISOR, Role.COORDINATOR, Role.SECURITY_IN_CHARGE)
+  @Get('user/:userIdOrEmail')
+  @Crud(CrudOperation.READ)
+  @Roles(Role.SECURITY_GUARD, Role.SECURITY_SUPERVISOR, Role.COORDINATOR, Role.SECURITY_IN_CHARGE, Role.CLIENT)
   async getHistory(
-    @Param('userId') userId: string,
+    @Param('userIdOrEmail') userIdOrEmail: string,
     @Query('filter') filter: string,
   ) {
-    console.log(`📡 [AttendanceController] GET /attendance/user/${userId} - Request received`);
+    console.log(`📡 [AttendanceController] GET /attendance/user/${userIdOrEmail} - Request received`);
     console.log(`📡 [AttendanceController] Filter: ${filter || 'none'}`);
     try {
-      const result = await this.attendanceService.getAttendanceHistory(userId, filter);
+      const result = await this.attendanceService.getAttendanceHistory(userIdOrEmail, filter);
       console.log(`✅ [AttendanceController] Successfully returned ${result?.length || 0} records`);
       return result;
     } catch (error) {

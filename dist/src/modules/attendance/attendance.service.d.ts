@@ -6,14 +6,10 @@ export declare class AttendanceService {
     constructor(prisma: PrismaService);
     private buildCheckInTime;
     getAllAttendance(): Promise<({
-        post: {
-            id: string;
-            name: string;
-        };
         user: {
             id: string;
-            name: string;
             employeeId: string;
+            name: string;
             role: import(".prisma/client").$Enums.Role;
         };
         markedBy: {
@@ -21,30 +17,30 @@ export declare class AttendanceService {
             name: string;
             role: import(".prisma/client").$Enums.Role;
         };
+        post: {
+            id: string;
+            name: string;
+        };
     } & {
         id: string;
-        createdAt: Date;
-        updatedAt: Date;
-        postId: string;
-        userId: string;
         date: Date;
+        checkInTime: Date;
         shiftHours: number;
         status: import(".prisma/client").$Enums.AttendanceStatus;
+        userId: string;
+        markedById: string;
+        postId: string;
         captureLatitude: number | null;
         captureLongitude: number | null;
         captureAddress: string | null;
-        checkInTime: Date;
-        markedById: string;
+        createdAt: Date;
+        updatedAt: Date;
     })[]>;
     markAttendance(dto: CreateAttendanceDto, authenticatedUser: User): Promise<({
-        post: {
-            id: string;
-            name: string;
-        };
         user: {
             id: string;
-            name: string;
             employeeId: string;
+            name: string;
             role: import(".prisma/client").$Enums.Role;
         };
         markedBy: {
@@ -52,30 +48,30 @@ export declare class AttendanceService {
             name: string;
             role: import(".prisma/client").$Enums.Role;
         };
+        post: {
+            id: string;
+            name: string;
+        };
     } & {
         id: string;
-        createdAt: Date;
-        updatedAt: Date;
-        postId: string;
-        userId: string;
         date: Date;
+        checkInTime: Date;
         shiftHours: number;
         status: import(".prisma/client").$Enums.AttendanceStatus;
+        userId: string;
+        markedById: string;
+        postId: string;
         captureLatitude: number | null;
         captureLongitude: number | null;
         captureAddress: string | null;
-        checkInTime: Date;
-        markedById: string;
+        createdAt: Date;
+        updatedAt: Date;
     })[]>;
-    getAttendanceHistory(userId: string, filter?: string): Promise<({
-        post: {
-            id: string;
-            name: string;
-        };
+    getAttendanceHistory(userIdOrEmail: string, filter?: string): Promise<({
         user: {
             id: string;
-            name: string;
             employeeId: string;
+            name: string;
             role: import(".prisma/client").$Enums.Role;
         };
         markedBy: {
@@ -83,19 +79,23 @@ export declare class AttendanceService {
             name: string;
             role: import(".prisma/client").$Enums.Role;
         };
+        post: {
+            id: string;
+            name: string;
+        };
     } & {
         id: string;
-        createdAt: Date;
-        updatedAt: Date;
-        postId: string;
-        userId: string;
         date: Date;
+        checkInTime: Date;
         shiftHours: number;
         status: import(".prisma/client").$Enums.AttendanceStatus;
+        userId: string;
+        markedById: string;
+        postId: string;
         captureLatitude: number | null;
         captureLongitude: number | null;
         captureAddress: string | null;
-        checkInTime: Date;
-        markedById: string;
+        createdAt: Date;
+        updatedAt: Date;
     })[]>;
 }

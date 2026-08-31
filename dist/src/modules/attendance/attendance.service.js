@@ -73,8 +73,22 @@ let AttendanceService = class AttendanceService {
         else if (dto.userIds && Array.isArray(dto.userIds) && dto.userIds.length > 0) {
             targetUserIds = dto.userIds;
         }
+        else if (dto.userEmails && Array.isArray(dto.userEmails) && dto.userEmails.length > 0) {
+            console.log(`📧 [AttendanceService] Resolving emails to UUIDs:`, dto.userEmails);
+            const usersFromEmails = await this.prisma.user.findMany({
+                where: { email: { in: dto.userEmails } },
+                select: { id: true, email: true, name: true },
+            });
+            if (usersFromEmails.length !== dto.userEmails.length) {
+                const foundEmails = usersFromEmails.map((u) => u.email);
+                const missingEmails = dto.userEmails.filter((e) => !foundEmails.includes(e));
+                throw new common_1.NotFoundException(`One or more guard emails not found: ${missingEmails.join(', ')}`);
+            }
+            targetUserIds = usersFromEmails.map((u) => u.id);
+            console.log(`✅ [AttendanceService] Resolved ${targetUserIds.length} emails to UUIDs`);
+        }
         else {
-            throw new common_1.BadRequestException('Either userId or userIds must be provided.');
+            throw new common_1.BadRequestException('Either userId, userIds, or userEmails must be provided.');
         }
         if (markedByUser.role === client_1.Role.SECURITY_GUARD) {
             if (targetUserIds.length > 1 || targetUserIds[0] !== markedById) {
@@ -136,8 +150,25 @@ let AttendanceService = class AttendanceService {
             throw error;
         }
     }
-    async getAttendanceHistory(userId, filter) {
+    async getAttendanceHistory(userIdOrEmail, filter) {
         try {
+            const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userIdOrEmail);
+            let userId;
+            if (isUUID) {
+                userId = userIdOrEmail;
+            }
+            else {
+                console.log(`📧 [AttendanceService] Resolving email to UUID: ${userIdOrEmail}`);
+                const user = await this.prisma.user.findUnique({
+                    where: { email: userIdOrEmail },
+                    select: { id: true },
+                });
+                if (!user) {
+                    throw new common_1.NotFoundException(`User with email ${userIdOrEmail} not found.`);
+                }
+                userId = user.id;
+                console.log(`✅ [AttendanceService] Resolved email to UUID: ${userId}`);
+            }
             const whereClause = { userId };
             if (filter === 'month') {
                 const now = new Date();
@@ -161,7 +192,7 @@ let AttendanceService = class AttendanceService {
         }
         catch (error) {
             console.error('❌ [AttendanceService] Error in getAttendanceHistory:', error);
-            return [];
+            throw error;
         }
     }
 };

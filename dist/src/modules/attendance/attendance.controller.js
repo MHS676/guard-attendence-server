@@ -18,13 +18,15 @@ const attendance_service_1 = require("./attendance.service");
 const create_attendance_dto_1 = require("./dto/create-attendance.dto");
 const jwt_auth_guard_1 = require("../auth/jwt-auth.guard");
 const roles_guard_1 = require("../auth/roles.guard");
+const crud_guard_1 = require("../auth/crud.guard");
+const crud_decorator_1 = require("../auth/crud.decorator");
 const client_1 = require("@prisma/client");
 let AttendanceController = class AttendanceController {
     constructor(attendanceService) {
         this.attendanceService = attendanceService;
     }
     async createAttendance(req, createAttendanceDto) {
-        console.log(`📡 [AttendanceController] POST /attendance - Request from user: ${req.user.id}`);
+        console.log(`📡 [AttendanceController] POST /attendance - Request from user: ${req.user.id} (${req.user.role})`);
         console.log(`📡 [AttendanceController] Payload:`, createAttendanceDto);
         try {
             const result = await this.attendanceService.markAttendance(createAttendanceDto, req.user);
@@ -44,11 +46,11 @@ let AttendanceController = class AttendanceController {
     async getAllAttendance() {
         return this.attendanceService.getAllAttendance();
     }
-    async getHistory(userId, filter) {
-        console.log(`📡 [AttendanceController] GET /attendance/user/${userId} - Request received`);
+    async getHistory(userIdOrEmail, filter) {
+        console.log(`📡 [AttendanceController] GET /attendance/user/${userIdOrEmail} - Request received`);
         console.log(`📡 [AttendanceController] Filter: ${filter || 'none'}`);
         try {
-            const result = await this.attendanceService.getAttendanceHistory(userId, filter);
+            const result = await this.attendanceService.getAttendanceHistory(userIdOrEmail, filter);
             console.log(`✅ [AttendanceController] Successfully returned ${result?.length || 0} records`);
             return result;
         }
@@ -61,7 +63,8 @@ let AttendanceController = class AttendanceController {
 exports.AttendanceController = AttendanceController;
 __decorate([
     (0, common_1.Post)(),
-    (0, roles_guard_1.Roles)(client_1.Role.SECURITY_GUARD, client_1.Role.SECURITY_SUPERVISOR, client_1.Role.COORDINATOR, client_1.Role.SECURITY_IN_CHARGE),
+    (0, crud_decorator_1.Crud)(crud_guard_1.CrudOperation.CREATE),
+    (0, roles_guard_1.Roles)(client_1.Role.SECURITY_GUARD, client_1.Role.SECURITY_SUPERVISOR, client_1.Role.COORDINATOR, client_1.Role.SECURITY_IN_CHARGE, client_1.Role.CLIENT),
     __param(0, (0, common_1.Request)()),
     __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
@@ -70,15 +73,17 @@ __decorate([
 ], AttendanceController.prototype, "createAttendance", null);
 __decorate([
     (0, common_1.Get)(),
+    (0, crud_decorator_1.Crud)(crud_guard_1.CrudOperation.READ),
     (0, roles_guard_1.Roles)(client_1.Role.COORDINATOR, client_1.Role.SECURITY_IN_CHARGE),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", Promise)
 ], AttendanceController.prototype, "getAllAttendance", null);
 __decorate([
-    (0, common_1.Get)('user/:userId'),
-    (0, roles_guard_1.Roles)(client_1.Role.SECURITY_GUARD, client_1.Role.SECURITY_SUPERVISOR, client_1.Role.COORDINATOR, client_1.Role.SECURITY_IN_CHARGE),
-    __param(0, (0, common_1.Param)('userId')),
+    (0, common_1.Get)('user/:userIdOrEmail'),
+    (0, crud_decorator_1.Crud)(crud_guard_1.CrudOperation.READ),
+    (0, roles_guard_1.Roles)(client_1.Role.SECURITY_GUARD, client_1.Role.SECURITY_SUPERVISOR, client_1.Role.COORDINATOR, client_1.Role.SECURITY_IN_CHARGE, client_1.Role.CLIENT),
+    __param(0, (0, common_1.Param)('userIdOrEmail')),
     __param(1, (0, common_1.Query)('filter')),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String, String]),
@@ -86,7 +91,7 @@ __decorate([
 ], AttendanceController.prototype, "getHistory", null);
 exports.AttendanceController = AttendanceController = __decorate([
     (0, common_1.Controller)('attendance'),
-    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard, crud_guard_1.CrudGuard),
     __metadata("design:paramtypes", [attendance_service_1.AttendanceService])
 ], AttendanceController);
 //# sourceMappingURL=attendance.controller.js.map

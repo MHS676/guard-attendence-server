@@ -225,6 +225,85 @@ async function main() {
 
   console.log(`✅ Demo Client ensured: ${clientUserUpsert.email}`);
 
+  // ======================================================
+  // 0c. SEED TEST ACCOUNTS FOR ALL ROLES
+  // ======================================================
+  console.log(`\n--- Seeding Test Accounts for All Roles ---`);
+
+  const testAccounts = [
+    // COORDINATOR
+    {
+      email: 'coordinator@falconsecurity.com',
+      employeeId: '3001',
+      name: 'Coordinator Account',
+      role: 'COORDINATOR' as Role,
+      password: 'SecurePassword123!',
+    },
+    // SECURITY_SUPERVISOR
+    {
+      email: 'supervisor@falconsecurity.com',
+      employeeId: '3002',
+      name: 'Supervisor Account',
+      role: 'SECURITY_SUPERVISOR' as Role,
+      password: 'SecurePassword123!',
+    },
+    // SECURITY_IN_CHARGE
+    {
+      email: 'in_charge@falconsecurity.com',
+      employeeId: '3003',
+      name: 'Security In Charge',
+      role: 'SECURITY_IN_CHARGE' as Role,
+      password: 'SecurePassword123!',
+    },
+    // SECURITY_GUARD - Multiple accounts for testing
+    {
+      email: 'guard1@falconsecurity.com',
+      employeeId: '4001',
+      name: 'Guard One',
+      role: 'SECURITY_GUARD' as Role,
+      password: 'SecurePassword123!',
+    },
+    {
+      email: 'guard2@falconsecurity.com',
+      employeeId: '4002',
+      name: 'Guard Two',
+      role: 'SECURITY_GUARD' as Role,
+      password: 'SecurePassword123!',
+    },
+    // CLIENT - Additional client account
+    {
+      email: 'client@falconsecurity.com',
+      employeeId: '5001',
+      name: 'Client Account',
+      role: 'CLIENT' as Role,
+      password: 'SecurePassword123!',
+    },
+  ];
+
+  for (const account of testAccounts) {
+    const hashedPassword = await bcrypt.hash(account.password, 10);
+    const user = await prisma.user.upsert({
+      where: { email: account.email },
+      update: {
+        password: hashedPassword,
+        role: account.role,
+        name: account.name,
+        isActive: true,
+      },
+      create: {
+        email: account.email,
+        employeeId: account.employeeId,
+        password: hashedPassword,
+        name: account.name,
+        role: account.role,
+        isActive: true,
+      },
+    });
+    console.log(`✅ Test Account Seeded: ${user.email} (${user.role}) - ID: ${user.employeeId}`);
+  }
+
+  console.log(`✅ All test accounts seeded successfully!`);
+
   // Companies
   const falconCompany = await prisma.company.upsert({
     where: { name: 'Falcon Security Limited' },

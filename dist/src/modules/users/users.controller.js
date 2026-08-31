@@ -16,6 +16,10 @@ exports.UsersController = void 0;
 const common_1 = require("@nestjs/common");
 const users_service_1 = require("./users.service");
 const client_1 = require("@prisma/client");
+const jwt_auth_guard_1 = require("../auth/jwt-auth.guard");
+const roles_guard_1 = require("../auth/roles.guard");
+const crud_guard_1 = require("../auth/crud.guard");
+const crud_decorator_1 = require("../auth/crud.decorator");
 let UsersController = class UsersController {
     constructor(usersService) {
         this.usersService = usersService;
@@ -30,6 +34,8 @@ let UsersController = class UsersController {
 exports.UsersController = UsersController;
 __decorate([
     (0, common_1.Get)(),
+    (0, crud_decorator_1.Crud)(crud_guard_1.CrudOperation.READ),
+    (0, roles_guard_1.Roles)(client_1.Role.COORDINATOR, client_1.Role.SECURITY_IN_CHARGE, client_1.Role.SECURITY_SUPERVISOR, client_1.Role.CLIENT),
     __param(0, (0, common_1.Query)('role')),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [String]),
@@ -37,6 +43,7 @@ __decorate([
 ], UsersController.prototype, "findAll", null);
 exports.UsersController = UsersController = __decorate([
     (0, common_1.Controller)('users'),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard, crud_guard_1.CrudGuard),
     __metadata("design:paramtypes", [users_service_1.UsersService])
 ], UsersController);
 //# sourceMappingURL=users.controller.js.map

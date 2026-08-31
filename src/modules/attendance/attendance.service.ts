@@ -79,15 +79,33 @@ export class AttendanceService {
       throw new ForbiddenException('Unauthorized role for logging attendance.');
     }
 
-    // 3. Resolve target user IDs: support both single userId and batch userIds
+    // 3. Resolve target user IDs: support single userId, batch userIds, or batch userEmails
     let targetUserIds: string[] = [];
 
     if (dto.userId) {
       targetUserIds = [dto.userId];
     } else if (dto.userIds && Array.isArray(dto.userIds) && dto.userIds.length > 0) {
       targetUserIds = dto.userIds;
+    } else if (dto.userEmails && Array.isArray(dto.userEmails) && dto.userEmails.length > 0) {
+      // 3a. Resolve emails to UUIDs
+      console.log(`📧 [AttendanceService] Resolving emails to UUIDs:`, dto.userEmails);
+      const usersFromEmails = await this.prisma.user.findMany({
+        where: { email: { in: dto.userEmails } },
+        select: { id: true, email: true, name: true },
+      });
+
+      if (usersFromEmails.length !== dto.userEmails.length) {
+        const foundEmails = usersFromEmails.map((u) => u.email);
+        const missingEmails = dto.userEmails.filter((e) => !foundEmails.includes(e));
+        throw new NotFoundException(
+          `One or more guard emails not found: ${missingEmails.join(', ')}`,
+        );
+      }
+
+      targetUserIds = usersFromEmails.map((u) => u.id);
+      console.log(`✅ [AttendanceService] Resolved ${targetUserIds.length} emails to UUIDs`);
     } else {
-      throw new BadRequestException('Either userId or userIds must be provided.');
+      throw new BadRequestException('Either userId, userIds, or userEmails must be provided.');
     }
 
     // Prevent bulk operations for SECURITY_GUARD role (can only mark for themselves)
@@ -171,8 +189,35 @@ export class AttendanceService {
     }
   }
 
-  async getAttendanceHistory(userId: string, filter?: string) {
+  async getAttendanceHistory(userIdOrEmail: string, filter?: string) {
     try {
+      // 1. Determine if input is a UUID or email
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        userIdOrEmail,
+      );
+
+      let userId: string;
+
+      if (isUUID) {
+        // Input is already a UUID
+        userId = userIdOrEmail;
+      } else {
+        // Input is an email - resolve to UUID
+        console.log(`📧 [AttendanceService] Resolving email to UUID: ${userIdOrEmail}`);
+        const user = await this.prisma.user.findUnique({
+          where: { email: userIdOrEmail },
+          select: { id: true },
+        });
+
+        if (!user) {
+          throw new NotFoundException(`User with email ${userIdOrEmail} not found.`);
+        }
+
+        userId = user.id;
+        console.log(`✅ [AttendanceService] Resolved email to UUID: ${userId}`);
+      }
+
+      // 2. Fetch attendance records with optional filtering
       const whereClause: any = { userId };
 
       if (filter === 'month') {
@@ -199,7 +244,7 @@ export class AttendanceService {
       return records;
     } catch (error) {
       console.error('❌ [AttendanceService] Error in getAttendanceHistory:', error);
-      return [];
+      throw error;
     }
   }
 }

@@ -16,6 +16,11 @@ exports.PostsController = void 0;
 const common_1 = require("@nestjs/common");
 const posts_service_1 = require("./posts.service");
 const create_post_dto_1 = require("./dto/create-post.dto");
+const client_1 = require("@prisma/client");
+const jwt_auth_guard_1 = require("../auth/jwt-auth.guard");
+const roles_guard_1 = require("../auth/roles.guard");
+const crud_guard_1 = require("../auth/crud.guard");
+const crud_decorator_1 = require("../auth/crud.decorator");
 let PostsController = class PostsController {
     constructor(postsService) {
         this.postsService = postsService;
@@ -30,12 +35,16 @@ let PostsController = class PostsController {
 exports.PostsController = PostsController;
 __decorate([
     (0, common_1.Get)(),
+    (0, crud_decorator_1.Crud)(crud_guard_1.CrudOperation.READ),
+    (0, roles_guard_1.Roles)(client_1.Role.COORDINATOR, client_1.Role.SECURITY_IN_CHARGE, client_1.Role.SECURITY_SUPERVISOR, client_1.Role.CLIENT, client_1.Role.SECURITY_GUARD),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", Promise)
 ], PostsController.prototype, "findAll", null);
 __decorate([
     (0, common_1.Post)(),
+    (0, crud_decorator_1.Crud)(crud_guard_1.CrudOperation.CREATE),
+    (0, roles_guard_1.Roles)(client_1.Role.COORDINATOR, client_1.Role.SECURITY_IN_CHARGE),
     __param(0, (0, common_1.Body)()),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", [create_post_dto_1.CreatePostDto]),
@@ -43,6 +52,7 @@ __decorate([
 ], PostsController.prototype, "create", null);
 exports.PostsController = PostsController = __decorate([
     (0, common_1.Controller)('posts'),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard, crud_guard_1.CrudGuard),
     __metadata("design:paramtypes", [posts_service_1.PostsService])
 ], PostsController);
 //# sourceMappingURL=posts.controller.js.map

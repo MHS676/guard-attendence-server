@@ -18,7 +18,7 @@ export class UsersService {
   async findByRole(role: Role) {
     return this.prisma.user.findMany({
       where: { role },
-      select: { id: true, name: true, employeeId: true, role: true },
+      select: { id: true, name: true, email: true, employeeId: true, role: true },
     });
   }
 }

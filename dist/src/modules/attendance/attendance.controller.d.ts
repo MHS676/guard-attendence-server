@@ -69,7 +69,7 @@ export declare class AttendanceController {
         createdAt: Date;
         updatedAt: Date;
     })[]>;
-    getHistory(userId: string, filter: string): Promise<({
+    getHistory(userIdOrEmail: string, filter: string): Promise<({
         user: {
             name: string;
             id: string;

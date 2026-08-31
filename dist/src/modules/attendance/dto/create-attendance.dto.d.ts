@@ -24,6 +24,7 @@ export declare class BatchAttendanceDto {
 export declare class CreateAttendanceDto {
     userId?: string;
     userIds?: string[];
+    userEmails?: string[];
     postId: string;
     date: string;
     time: string;

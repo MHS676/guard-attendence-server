@@ -124,6 +124,12 @@ __decorate([
     __metadata("design:type", Array)
 ], CreateAttendanceDto.prototype, "userIds", void 0);
 __decorate([
+    (0, class_validator_1.IsArray)(),
+    (0, class_validator_1.IsString)({ each: true }),
+    (0, class_validator_1.IsOptional)(),
+    __metadata("design:type", Array)
+], CreateAttendanceDto.prototype, "userEmails", void 0);
+__decorate([
     (0, class_validator_1.IsUUID)(),
     (0, class_validator_1.IsNotEmpty)(),
     __metadata("design:type", String)

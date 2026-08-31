@@ -86,16 +86,22 @@ export class BatchAttendanceDto {
 
 /**
  * Combined DTO supporting both single and batch attendance marking
+ * Accepts either UUIDs or emails for user identification
  */
 export class CreateAttendanceDto {
   @IsUUID()
   @IsOptional()
-  userId?: string; // Single guard ID
+  userId?: string; // Single guard ID (UUID)
 
   @IsArray()
   @IsUUID('4', { each: true })
   @IsOptional()
-  userIds?: string[]; // Multiple guard IDs
+  userIds?: string[]; // Multiple guard IDs (UUIDs)
+
+  @IsArray()
+  @IsString({ each: true })
+  @IsOptional()
+  userEmails?: string[]; // Multiple guard emails (for mobile app)
 
   @IsUUID()
   @IsNotEmpty()
