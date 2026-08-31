@@ -16,6 +16,9 @@ exports.AttendanceController = void 0;
 const common_1 = require("@nestjs/common");
 const attendance_service_1 = require("./attendance.service");
 const create_attendance_dto_1 = require("./dto/create-attendance.dto");
+const jwt_auth_guard_1 = require("../auth/jwt-auth.guard");
+const roles_guard_1 = require("../auth/roles.guard");
+const client_1 = require("@prisma/client");
 let AttendanceController = class AttendanceController {
     constructor(attendanceService) {
         this.attendanceService = attendanceService;
@@ -58,6 +61,7 @@ let AttendanceController = class AttendanceController {
 exports.AttendanceController = AttendanceController;
 __decorate([
     (0, common_1.Post)(),
+    (0, roles_guard_1.Roles)(client_1.Role.SECURITY_GUARD, client_1.Role.SECURITY_SUPERVISOR, client_1.Role.COORDINATOR, client_1.Role.SECURITY_IN_CHARGE),
     __param(0, (0, common_1.Request)()),
     __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
@@ -66,12 +70,14 @@ __decorate([
 ], AttendanceController.prototype, "createAttendance", null);
 __decorate([
     (0, common_1.Get)(),
+    (0, roles_guard_1.Roles)(client_1.Role.COORDINATOR, client_1.Role.SECURITY_IN_CHARGE),
     __metadata("design:type", Function),
     __metadata("design:paramtypes", []),
     __metadata("design:returntype", Promise)
 ], AttendanceController.prototype, "getAllAttendance", null);
 __decorate([
     (0, common_1.Get)('user/:userId'),
+    (0, roles_guard_1.Roles)(client_1.Role.SECURITY_GUARD, client_1.Role.SECURITY_SUPERVISOR, client_1.Role.COORDINATOR, client_1.Role.SECURITY_IN_CHARGE),
     __param(0, (0, common_1.Param)('userId')),
     __param(1, (0, common_1.Query)('filter')),
     __metadata("design:type", Function),
@@ -80,6 +86,7 @@ __decorate([
 ], AttendanceController.prototype, "getHistory", null);
 exports.AttendanceController = AttendanceController = __decorate([
     (0, common_1.Controller)('attendance'),
+    (0, common_1.UseGuards)(jwt_auth_guard_1.JwtAuthGuard, roles_guard_1.RolesGuard),
     __metadata("design:paramtypes", [attendance_service_1.AttendanceService])
 ], AttendanceController);
 //# sourceMappingURL=attendance.controller.js.map

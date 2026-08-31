@@ -1,8 +1,12 @@
-import { Controller, Post, Get, Body, Query, Param, Request } from '@nestjs/common';
+import { Controller, Post, Get, Body, Query, Param, Request, UseGuards } from '@nestjs/common';
 import { AttendanceService } from './attendance.service';
 import { CreateAttendanceDto } from './dto/create-attendance.dto';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { RolesGuard, Roles } from '../auth/roles.guard';
+import { Role } from '@prisma/client';
 
 @Controller('attendance')
+@UseGuards(JwtAuthGuard, RolesGuard)
 export class AttendanceController {
   constructor(private readonly attendanceService: AttendanceService) {}
 
@@ -11,6 +15,7 @@ export class AttendanceController {
    * Requires: SECURITY_GUARD (self-check-in), SECURITY_SUPERVISOR, COORDINATOR, or SECURITY_IN_CHARGE
    */
   @Post()
+  @Roles(Role.SECURITY_GUARD, Role.SECURITY_SUPERVISOR, Role.COORDINATOR, Role.SECURITY_IN_CHARGE)
   async createAttendance(@Request() req, @Body() createAttendanceDto: CreateAttendanceDto) {
     console.log(`📡 [AttendanceController] POST /attendance - Request from user: ${req.user.id}`);
     console.log(`📡 [AttendanceController] Payload:`, createAttendanceDto);
@@ -38,11 +43,13 @@ export class AttendanceController {
   }
 
   @Get()
+  @Roles(Role.COORDINATOR, Role.SECURITY_IN_CHARGE)
   async getAllAttendance() {
     return this.attendanceService.getAllAttendance();
   }
 
   @Get('user/:userId')
+  @Roles(Role.SECURITY_GUARD, Role.SECURITY_SUPERVISOR, Role.COORDINATOR, Role.SECURITY_IN_CHARGE)
   async getHistory(
     @Param('userId') userId: string,
     @Query('filter') filter: string,

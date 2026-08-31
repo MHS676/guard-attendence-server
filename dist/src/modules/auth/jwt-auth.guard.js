@@ -10,27 +10,6 @@ exports.JwtAuthGuard = void 0;
 const common_1 = require("@nestjs/common");
 const passport_1 = require("@nestjs/passport");
 let JwtAuthGuard = class JwtAuthGuard extends (0, passport_1.AuthGuard)('jwt') {
-    canActivate(context) {
-        const request = context.switchToHttp().getRequest();
-        const authHeader = request.headers.authorization;
-        console.log(`🔐 [JwtAuthGuard] Checking authorization for: ${request.method} ${request.path}`);
-        console.log(`🔐 [JwtAuthGuard] Authorization header: ${authHeader ? 'Present' : 'MISSING'}`);
-        if (authHeader) {
-            const tokenPreview = authHeader.substring(0, 50) + (authHeader.length > 50 ? '...' : '');
-            console.log(`🔐 [JwtAuthGuard] Token preview: ${tokenPreview}`);
-        }
-        return super.canActivate(context);
-    }
-    handleRequest(err, user, info, context, status) {
-        console.log(`🔐 [JwtAuthGuard] handleRequest called`);
-        if (err)
-            console.error(`  ❌ Error:`, err.message);
-        if (info)
-            console.error(`  ❌ Info:`, info.message || info);
-        if (user)
-            console.log(`  ✅ User authenticated: ${user.id}`);
-        return super.handleRequest(err, user, info, context, status);
-    }
 };
 exports.JwtAuthGuard = JwtAuthGuard;
 exports.JwtAuthGuard = JwtAuthGuard = __decorate([

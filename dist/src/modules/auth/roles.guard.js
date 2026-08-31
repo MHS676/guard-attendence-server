@@ -13,7 +13,10 @@ exports.RolesGuard = exports.Roles = exports.ROLES_KEY = void 0;
 const common_1 = require("@nestjs/common");
 const core_1 = require("@nestjs/core");
 exports.ROLES_KEY = 'roles';
-const Roles = (...roles) => (0, common_1.SetMetadata)(exports.ROLES_KEY, roles);
+const Roles = (...roles) => {
+    const { SetMetadata } = require('@nestjs/common');
+    return SetMetadata(exports.ROLES_KEY, roles);
+};
 exports.Roles = Roles;
 let RolesGuard = class RolesGuard {
     constructor(reflector) {
@@ -27,8 +30,12 @@ let RolesGuard = class RolesGuard {
         if (!requiredRoles || requiredRoles.length === 0) {
             return true;
         }
-        const { user } = context.switchToHttp().getRequest();
-        return !!user && requiredRoles.includes(user.role);
+        const request = context.switchToHttp().getRequest();
+        const user = request.user;
+        if (!user) {
+            return false;
+        }
+        return requiredRoles.includes(user.role);
     }
 };
 exports.RolesGuard = RolesGuard;

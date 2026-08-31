@@ -13,50 +13,26 @@ exports.JwtStrategy = void 0;
 const common_1 = require("@nestjs/common");
 const passport_1 = require("@nestjs/passport");
 const passport_jwt_1 = require("passport-jwt");
-const config_1 = require("@nestjs/config");
-const prisma_service_1 = require("../prisma/prisma.service");
 let JwtStrategy = class JwtStrategy extends (0, passport_1.PassportStrategy)(passport_jwt_1.Strategy) {
-    constructor(prisma, configService) {
-        const secret = configService.get('JWT_SECRET') || 'your-secret-key-here';
-        console.log(`🔐 [JwtStrategy] Initialized with JWT_SECRET: "${secret}"`);
+    constructor() {
         super({
             jwtFromRequest: passport_jwt_1.ExtractJwt.fromAuthHeaderAsBearerToken(),
             ignoreExpiration: false,
-            secretOrKey: secret,
+            secretOrKey: process.env.JWT_SECRET || 'your-secret-key-change-this',
         });
-        this.prisma = prisma;
-        this.configService = configService;
     }
-    async validate(payload) {
-        console.log('🔑 [JwtStrategy] Successfully decoded token payload:', JSON.stringify(payload));
-        console.log(`🔑 [JwtStrategy] Looking up user with ID: ${payload.sub}`);
-        const user = await this.prisma.user.findUnique({
-            where: { id: payload.sub },
-            include: { guardProfile: true },
-        });
-        if (!user) {
-            console.warn(`⚠️ [JwtStrategy] User with ID ${payload.sub} NOT found in database.`);
-            throw new common_1.UnauthorizedException('User not found in database');
-        }
-        console.log(`✅ [JwtStrategy] User found and validated: ${user.id} (${user.name})`);
-        return user;
-    }
-    handleRequest(err, user, info) {
-        if (err || !user) {
-            console.error('❌ [JwtStrategy] handleRequest - JWT verification FAILED');
-            if (err)
-                console.error('  Error:', err.message || err);
-            if (info)
-                console.error('  Info:', info.message || info);
-            throw err || new common_1.UnauthorizedException('Invalid or expired token');
-        }
-        return user;
+    validate(payload) {
+        return {
+            id: payload.sub || payload.id,
+            email: payload.email,
+            role: payload.role,
+            name: payload.name,
+        };
     }
 };
 exports.JwtStrategy = JwtStrategy;
 exports.JwtStrategy = JwtStrategy = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [prisma_service_1.PrismaService,
-        config_1.ConfigService])
+    __metadata("design:paramtypes", [])
 ], JwtStrategy);
 //# sourceMappingURL=jwt.strategy.js.map
