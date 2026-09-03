@@ -106,6 +106,9 @@ let AttendanceService = class AttendanceService {
             throw new common_1.ForbiddenException(`One or more target guards are inactive: ${inactiveUsers.map((u) => u.name).join(', ')}`);
         }
         const dateObj = new Date(dto.date);
+        console.log(`📝 [AttendanceService] Creating attendance for ${targetUserIds.length} users`);
+        console.log(`   Date: ${dto.date}, Time: ${dto.time}, Post: ${dto.postId}`);
+        console.log(`   Target User IDs: ${targetUserIds.join(', ')}`);
         try {
             const results = await this.prisma.$transaction(targetUserIds.map((userId) => this.prisma.attendance.upsert({
                 where: {
@@ -142,7 +145,10 @@ let AttendanceService = class AttendanceService {
                     markedBy: { select: { id: true, name: true, role: true } },
                 },
             })));
-            console.log(`✅ [AttendanceService] Marked attendance for ${results.length} guard(s)`);
+            console.log(`✅ [AttendanceService] Successfully created/updated ${results.length} records`);
+            results.forEach((r, i) => {
+                console.log(`   [${i + 1}] User: ${r.user?.name} (${r.userId}), Date: ${r.date}, Status: ${r.status}`);
+            });
             return results;
         }
         catch (error) {
@@ -170,15 +176,7 @@ let AttendanceService = class AttendanceService {
                 console.log(`✅ [AttendanceService] Resolved email to UUID: ${userId}`);
             }
             const whereClause = { userId };
-            if (filter === 'month') {
-                const now = new Date();
-                const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-                const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
-                whereClause.createdAt = {
-                    gte: startOfMonth,
-                    lte: endOfMonth,
-                };
-            }
+            console.log(`🔍 [AttendanceService] Fetching attendance for user: ${userId} (filter: ${filter || 'none'})`);
             const records = await this.prisma.attendance.findMany({
                 where: whereClause,
                 include: {
@@ -188,6 +186,17 @@ let AttendanceService = class AttendanceService {
                 },
                 orderBy: { date: 'desc' },
             });
+            console.log(`📊 [AttendanceService] Found ${records.length} total records for ${userIdOrEmail}`);
+            if (records.length === 0) {
+                console.warn(`⚠️ [AttendanceService] No records found for user ${userIdOrEmail}`);
+                const allCount = await this.prisma.attendance.count({
+                    where: { userId },
+                });
+                console.log(`🔔 [AttendanceService] Database has ${allCount} records total for this user`);
+            }
+            else {
+                console.log(`✅ [AttendanceService] Sample record:`, JSON.stringify(records[0], null, 2));
+            }
             return records;
         }
         catch (error) {

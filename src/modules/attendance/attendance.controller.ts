@@ -65,6 +65,9 @@ export class AttendanceController {
     try {
       const result = await this.attendanceService.getAttendanceHistory(userIdOrEmail, filter);
       console.log(`✅ [AttendanceController] Successfully returned ${result?.length || 0} records`);
+      if (result?.length > 0) {
+        console.log(`📋 [AttendanceController] Sample record:`, JSON.stringify(result[0], null, 2));
+      }
       return result;
     } catch (error) {
       console.error(`❌ [AttendanceController] Error fetching history:`, error);
