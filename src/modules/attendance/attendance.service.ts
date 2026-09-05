@@ -54,18 +54,11 @@ export class AttendanceService {
     // 1. Extract markedById from authenticated user and ensure it's a string
     const markedById = String(authenticatedUser.id);
 
-    // 2. Verify that markedById user exists and is active
-    const markedByUser = await this.prisma.user.findUnique({
-      where: { id: markedById },
-    });
-
-    if (!markedByUser) {
-      throw new NotFoundException('User marking attendance not found.');
-    }
-
-    if (!markedByUser.isActive) {
-      throw new ForbiddenException('User marking attendance is inactive.');
-    }
+    // 2. Verify user role from JWT (trust the JWT token's role claim)
+    // The user is authenticated via JWT from MDB-auth-server and may not exist in this attendance DB
+    // But we trust the role from the JWT token
+    
+    console.log(`📝 [AttendanceService] User ${authenticatedUser.email} (${authenticatedUser.role}) marking attendance for others`);
 
     // Permit Guards (self-check-in), Supervisors, Coordinators, and Security In-Charge
     const allowedRoles: Role[] = [
@@ -75,9 +68,12 @@ export class AttendanceService {
       Role.SECURITY_IN_CHARGE,
     ];
 
-    if (!allowedRoles.includes(markedByUser.role)) {
-      throw new ForbiddenException('Unauthorized role for logging attendance.');
+    if (!authenticatedUser.role || !allowedRoles.includes(authenticatedUser.role as Role)) {
+      throw new ForbiddenException(
+        `Unauthorized role for logging attendance. Role: ${authenticatedUser.role}. Allowed: ${allowedRoles.join(', ')}`
+      );
     }
+
 
     // 3. Resolve target user IDs: support single userId, batch userIds, or batch userEmails
     let targetUserIds: string[] = [];
@@ -109,7 +105,7 @@ export class AttendanceService {
     }
 
     // Prevent bulk operations for SECURITY_GUARD role (can only mark for themselves)
-    if (markedByUser.role === Role.SECURITY_GUARD) {
+    if (authenticatedUser.role === Role.SECURITY_GUARD) {
       if (targetUserIds.length > 1 || targetUserIds[0] !== markedById) {
         throw new ForbiddenException(
           'Security guards can only mark attendance for themselves.',
@@ -178,7 +174,6 @@ export class AttendanceService {
             include: {
               user: { select: { id: true, name: true, employeeId: true, role: true } },
               post: { select: { id: true, name: true } },
-              markedBy: { select: { id: true, name: true, role: true } },
             },
           }),
         ),
@@ -236,7 +231,6 @@ export class AttendanceService {
         include: {
           post: { select: { id: true, name: true } },
           user: { select: { id: true, name: true, employeeId: true, role: true } },
-          markedBy: { select: { id: true, name: true, role: true } },
         },
         orderBy: { date: 'desc' },
       });

@@ -8,19 +8,14 @@ export declare class AttendanceController {
         message: string;
         data: ({
             user: {
-                name: string;
                 id: string;
                 employeeId: string;
-                role: import(".prisma/client").$Enums.Role;
-            };
-            markedBy: {
                 name: string;
-                id: string;
                 role: import(".prisma/client").$Enums.Role;
             };
             post: {
-                name: string;
                 id: string;
+                name: string;
             };
         } & {
             id: string;
@@ -40,19 +35,19 @@ export declare class AttendanceController {
     }>;
     getAllAttendance(): Promise<({
         user: {
-            name: string;
             id: string;
             employeeId: string;
+            name: string;
             role: import(".prisma/client").$Enums.Role;
         };
         markedBy: {
-            name: string;
             id: string;
+            name: string;
             role: import(".prisma/client").$Enums.Role;
         };
         post: {
-            name: string;
             id: string;
+            name: string;
         };
     } & {
         id: string;
@@ -71,19 +66,14 @@ export declare class AttendanceController {
     })[]>;
     getHistory(userIdOrEmail: string, filter: string): Promise<({
         user: {
-            name: string;
             id: string;
             employeeId: string;
-            role: import(".prisma/client").$Enums.Role;
-        };
-        markedBy: {
             name: string;
-            id: string;
             role: import(".prisma/client").$Enums.Role;
         };
         post: {
-            name: string;
             id: string;
+            name: string;
         };
     } & {
         id: string;

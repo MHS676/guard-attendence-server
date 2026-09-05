@@ -48,23 +48,15 @@ let AttendanceService = class AttendanceService {
     }
     async markAttendance(dto, authenticatedUser) {
         const markedById = String(authenticatedUser.id);
-        const markedByUser = await this.prisma.user.findUnique({
-            where: { id: markedById },
-        });
-        if (!markedByUser) {
-            throw new common_1.NotFoundException('User marking attendance not found.');
-        }
-        if (!markedByUser.isActive) {
-            throw new common_1.ForbiddenException('User marking attendance is inactive.');
-        }
+        console.log(`📝 [AttendanceService] User ${authenticatedUser.email} (${authenticatedUser.role}) marking attendance for others`);
         const allowedRoles = [
             client_1.Role.SECURITY_GUARD,
             client_1.Role.SECURITY_SUPERVISOR,
             client_1.Role.COORDINATOR,
             client_1.Role.SECURITY_IN_CHARGE,
         ];
-        if (!allowedRoles.includes(markedByUser.role)) {
-            throw new common_1.ForbiddenException('Unauthorized role for logging attendance.');
+        if (!authenticatedUser.role || !allowedRoles.includes(authenticatedUser.role)) {
+            throw new common_1.ForbiddenException(`Unauthorized role for logging attendance. Role: ${authenticatedUser.role}. Allowed: ${allowedRoles.join(', ')}`);
         }
         let targetUserIds = [];
         if (dto.userId) {
@@ -90,7 +82,7 @@ let AttendanceService = class AttendanceService {
         else {
             throw new common_1.BadRequestException('Either userId, userIds, or userEmails must be provided.');
         }
-        if (markedByUser.role === client_1.Role.SECURITY_GUARD) {
+        if (authenticatedUser.role === client_1.Role.SECURITY_GUARD) {
             if (targetUserIds.length > 1 || targetUserIds[0] !== markedById) {
                 throw new common_1.ForbiddenException('Security guards can only mark attendance for themselves.');
             }
@@ -142,7 +134,6 @@ let AttendanceService = class AttendanceService {
                 include: {
                     user: { select: { id: true, name: true, employeeId: true, role: true } },
                     post: { select: { id: true, name: true } },
-                    markedBy: { select: { id: true, name: true, role: true } },
                 },
             })));
             console.log(`✅ [AttendanceService] Successfully created/updated ${results.length} records`);
@@ -182,7 +173,6 @@ let AttendanceService = class AttendanceService {
                 include: {
                     post: { select: { id: true, name: true } },
                     user: { select: { id: true, name: true, employeeId: true, role: true } },
-                    markedBy: { select: { id: true, name: true, role: true } },
                 },
                 orderBy: { date: 'desc' },
             });

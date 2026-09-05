@@ -43,11 +43,6 @@ export declare class AttendanceService {
             name: string;
             role: import(".prisma/client").$Enums.Role;
         };
-        markedBy: {
-            id: string;
-            name: string;
-            role: import(".prisma/client").$Enums.Role;
-        };
         post: {
             id: string;
             name: string;
@@ -71,11 +66,6 @@ export declare class AttendanceService {
         user: {
             id: string;
             employeeId: string;
-            name: string;
-            role: import(".prisma/client").$Enums.Role;
-        };
-        markedBy: {
-            id: string;
             name: string;
             role: import(".prisma/client").$Enums.Role;
         };
