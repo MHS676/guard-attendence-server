@@ -24,14 +24,9 @@ let JwtStrategy = class JwtStrategy extends (0, passport_1.PassportStrategy)(pas
         this.prisma = prisma;
     }
     async validate(payload) {
-        const user = await this.prisma.user.findUnique({
-            where: { email: payload.email },
-        });
-        if (!user || !user.isActive) {
-            return null;
-        }
+        console.log(`✅ [JwtStrategy] Token validated for user:`, payload.email, `role:`, payload.role);
         return {
-            id: user.id,
+            id: payload.sub || payload.id || payload.email,
             email: payload.email,
             role: payload.role,
             name: payload.name,

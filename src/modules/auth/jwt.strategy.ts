@@ -21,20 +21,16 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   /**
    * Validates the JWT payload and returns user info
    * This is called after JWT is verified
-   * Looks up the user in the attendance database by email to get their actual ID
+   * Token is issued by MDB-auth-server and contains user info
+   * We trust the token payload directly without requiring user to exist in attendance DB
    */
   async validate(payload: any) {
-    // Look up user by email in the attendance database
-    const user = await this.prisma.user.findUnique({
-      where: { email: payload.email },
-    });
-
-    if (!user || !user.isActive) {
-      return null;
-    }
-
+    console.log(`✅ [JwtStrategy] Token validated for user:`, payload.email, `role:`, payload.role);
+    
+    // Trust the JWT payload directly (token was signed by MDB-auth-server)
+    // This allows users from the auth system to access attendance records
     return {
-      id: user.id,
+      id: payload.sub || payload.id || payload.email, // Use subject, id, or email as user ID
       email: payload.email,
       role: payload.role,
       name: payload.name,
