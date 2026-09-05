@@ -47,7 +47,7 @@ let AttendanceService = class AttendanceService {
         });
     }
     async markAttendance(dto, authenticatedUser) {
-        const markedById = authenticatedUser.id;
+        const markedById = String(authenticatedUser.id);
         const markedByUser = await this.prisma.user.findUnique({
             where: { id: markedById },
         });

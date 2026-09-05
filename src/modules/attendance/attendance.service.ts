@@ -51,8 +51,8 @@ export class AttendanceService {
    * Supports both single userId and batch userIds
    */
   async markAttendance(dto: CreateAttendanceDto, authenticatedUser: User) {
-    // 1. Extract markedById from authenticated user
-    const markedById = authenticatedUser.id;
+    // 1. Extract markedById from authenticated user and ensure it's a string
+    const markedById = String(authenticatedUser.id);
 
     // 2. Verify that markedById user exists and is active
     const markedByUser = await this.prisma.user.findUnique({
