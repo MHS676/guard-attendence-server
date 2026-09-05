@@ -18,24 +18,24 @@ export declare class PostsService {
         id: string;
         code: string;
         name: string;
-        address: string | null;
-        territory: string | null;
-        latitude: number;
-        longitude: number;
-        companyId: string;
         createdAt: Date;
         updatedAt: Date;
+        territory: string | null;
+        companyId: string;
+        address: string | null;
+        latitude: number;
+        longitude: number;
     })[]>;
     create(data: CreatePostDto): Promise<{
         id: string;
         code: string;
         name: string;
-        address: string | null;
-        territory: string | null;
-        latitude: number;
-        longitude: number;
-        companyId: string;
         createdAt: Date;
         updatedAt: Date;
+        territory: string | null;
+        companyId: string;
+        address: string | null;
+        latitude: number;
+        longitude: number;
     }>;
 }

@@ -51,16 +51,13 @@ export class AttendanceService {
    * Supports both single userId and batch userIds
    */
   async markAttendance(dto: CreateAttendanceDto, authenticatedUser: User) {
-    // 1. Extract markedById from authenticated user and ensure it's a string
-    const markedById = String(authenticatedUser.id);
+    // 1. Extract markedById from authenticated user
+    // Since the user is from JWT, they may not exist in this DB, so we set markedById to null
+    const markedById = null; // Don't try to store a reference to auth system user
 
-    // 2. Verify user role from JWT (trust the JWT token's role claim)
-    // The user is authenticated via JWT from MDB-auth-server and may not exist in this attendance DB
-    // But we trust the role from the JWT token
-    
     console.log(`📝 [AttendanceService] User ${authenticatedUser.email} (${authenticatedUser.role}) marking attendance for others`);
 
-    // Permit Guards (self-check-in), Supervisors, Coordinators, and Security In-Charge
+    // 2. Verify user role from JWT (trust the JWT token's role claim)
     const allowedRoles: Role[] = [
       Role.SECURITY_GUARD,
       Role.SECURITY_SUPERVISOR,
@@ -205,19 +202,29 @@ export class AttendanceService {
         // Input is already a UUID
         userId = userIdOrEmail;
       } else {
-        // Input is an email - resolve to UUID
-        console.log(`📧 [AttendanceService] Resolving email to UUID: ${userIdOrEmail}`);
-        const user = await this.prisma.user.findUnique({
+        // Input is not a UUID - attempt to resolve as email first, then as employeeId
+        console.log(`📧 [AttendanceService] Resolving identifier to UUID (email or employeeId): ${userIdOrEmail}`);
+
+        // Try email
+        let user = await this.prisma.user.findUnique({
           where: { email: userIdOrEmail },
           select: { id: true },
         });
 
         if (!user) {
-          throw new NotFoundException(`User with email ${userIdOrEmail} not found.`);
+          // Try employeeId (some clients may send employee numbers as the user id)
+          user = await this.prisma.user.findUnique({
+            where: { employeeId: userIdOrEmail },
+            select: { id: true, employeeId: true },
+          });
+        }
+
+        if (!user) {
+          throw new NotFoundException(`User with identifier ${userIdOrEmail} not found.`);
         }
 
         userId = user.id;
-        console.log(`✅ [AttendanceService] Resolved email to UUID: ${userId}`);
+        console.log(`✅ [AttendanceService] Resolved identifier to UUID: ${userId}`);
       }
 
       // 2. Fetch ALL attendance records for this user (let frontend filter by month)

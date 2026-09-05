@@ -15,24 +15,24 @@ export declare class UsersService {
         };
     } & {
         id: string;
+        name: string;
+        createdAt: Date;
+        updatedAt: Date;
         employeeId: string;
         email: string | null;
         password: string;
-        name: string;
         role: import(".prisma/client").$Enums.Role;
         refreshToken: string | null;
         tokenVersion: number;
         isActive: boolean;
         supervisorId: string | null;
         postId: string | null;
-        createdAt: Date;
-        updatedAt: Date;
     })[]>;
     findByRole(role: Role): Promise<{
         id: string;
+        name: string;
         employeeId: string;
         email: string;
-        name: string;
         role: import(".prisma/client").$Enums.Role;
     }[]>;
 }

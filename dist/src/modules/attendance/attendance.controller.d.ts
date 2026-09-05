@@ -24,7 +24,7 @@ export declare class AttendanceController {
             shiftHours: number;
             status: import(".prisma/client").$Enums.AttendanceStatus;
             userId: string;
-            markedById: string;
+            markedById: string | null;
             postId: string;
             captureLatitude: number | null;
             captureLongitude: number | null;
@@ -56,7 +56,7 @@ export declare class AttendanceController {
         shiftHours: number;
         status: import(".prisma/client").$Enums.AttendanceStatus;
         userId: string;
-        markedById: string;
+        markedById: string | null;
         postId: string;
         captureLatitude: number | null;
         captureLongitude: number | null;
@@ -82,7 +82,7 @@ export declare class AttendanceController {
         shiftHours: number;
         status: import(".prisma/client").$Enums.AttendanceStatus;
         userId: string;
-        markedById: string;
+        markedById: string | null;
         postId: string;
         captureLatitude: number | null;
         captureLongitude: number | null;

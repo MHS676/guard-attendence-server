@@ -47,7 +47,7 @@ let AttendanceService = class AttendanceService {
         });
     }
     async markAttendance(dto, authenticatedUser) {
-        const markedById = String(authenticatedUser.id);
+        const markedById = null;
         console.log(`📝 [AttendanceService] User ${authenticatedUser.email} (${authenticatedUser.role}) marking attendance for others`);
         const allowedRoles = [
             client_1.Role.SECURITY_GUARD,
@@ -155,16 +155,22 @@ let AttendanceService = class AttendanceService {
                 userId = userIdOrEmail;
             }
             else {
-                console.log(`📧 [AttendanceService] Resolving email to UUID: ${userIdOrEmail}`);
-                const user = await this.prisma.user.findUnique({
+                console.log(`📧 [AttendanceService] Resolving identifier to UUID (email or employeeId): ${userIdOrEmail}`);
+                let user = await this.prisma.user.findUnique({
                     where: { email: userIdOrEmail },
                     select: { id: true },
                 });
                 if (!user) {
-                    throw new common_1.NotFoundException(`User with email ${userIdOrEmail} not found.`);
+                    user = await this.prisma.user.findUnique({
+                        where: { employeeId: userIdOrEmail },
+                        select: { id: true, employeeId: true },
+                    });
+                }
+                if (!user) {
+                    throw new common_1.NotFoundException(`User with identifier ${userIdOrEmail} not found.`);
                 }
                 userId = user.id;
-                console.log(`✅ [AttendanceService] Resolved email to UUID: ${userId}`);
+                console.log(`✅ [AttendanceService] Resolved identifier to UUID: ${userId}`);
             }
             const whereClause = { userId };
             console.log(`🔍 [AttendanceService] Fetching attendance for user: ${userId} (filter: ${filter || 'none'})`);

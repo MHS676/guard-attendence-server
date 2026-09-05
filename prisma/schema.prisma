@@ -124,8 +124,8 @@ model Attendance {
   userId           String
   user             User             @relation("GuardAttendance", fields: [userId], references: [id], onDelete: Cascade)
 
-  markedById       String
-  markedBy         User             @relation("MarkedBySupervisor", fields: [markedById], references: [id], onDelete: Restrict)
+  markedById       String?
+  markedBy         User?            @relation("MarkedBySupervisor", fields: [markedById], references: [id], onDelete: Restrict)
 
   postId           String
   post             Post             @relation(fields: [postId], references: [id], onDelete: Restrict)

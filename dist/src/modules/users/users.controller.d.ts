@@ -5,9 +5,9 @@ export declare class UsersController {
     constructor(usersService: UsersService);
     findAll(role?: Role): Promise<{
         id: string;
+        name: string;
         employeeId: string;
         email: string;
-        name: string;
         role: import(".prisma/client").$Enums.Role;
     }[]>;
 }
